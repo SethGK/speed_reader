@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Speed Reader</title>
+  <style>
+    :root {
+      --bg-color: #242933;
+      --text-color: #e2e8f0;
+      --accent-color: #4a5568;
+      --highlight-color: #63b3ed;
+      --control-bg: #2d3748;
+      --input-bg: #1a202c;
+    }
+    
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      height: 100vh;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1.5em;
+    }
+    
+    h1 {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      color: var(--highlight-color);
+      width: 100%;
+    }
+    
+    .container {
+      width: 90%;
+      max-width: 700px;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    textarea {
+      width: 100%;
+      height: 120px;
+      background: var(--input-bg);
+      color: var(--text-color);
+      padding: 0.8em;
+      border: none;
+      border-radius: 8px;
+      transition: height 0.3s ease, opacity 0.3s ease;
+      resize: vertical;
+    }
+    
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      z-index: 10;
+      padding: 8px 0;
+    }
+    
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    button, input[type="number"], input[type="range"] {
+      font-family: inherit;
+      font-size: 0.85rem;
+    }
+    
+    button {
+      padding: 0.4em 0.8em;
+      background: var(--accent-color);
+      color: var(--text-color);
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+    
+    button:hover {
+      background-color: var(--highlight-color);
+      color: var(--input-bg);
+    }
+    
+    input[type="number"] {
+      width: 60px;
+      padding: 0.3em;
+      border-radius: 4px;
+      border: none;
+      background: var(--input-bg);
+      color: var(--text-color);
+    }
+    
+    #reading-container {
+      position: relative;
+      height: 180px;
+      margin: 1.5rem 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    #word {
+      font-size: 3em;
+      cursor: move;
+      padding: 0.5em;
+      z-index: 5;
+      user-select: none;
+      color: var(--highlight-color);
+      text-align: center;
+      min-width: 200px;
+    }
+    
+    #progress-container {
+      width: 100%;
+      padding: 0.5rem 0;
+    }
+    
+    #progress-bar {
+      width: 100%;
+      height: 4px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: var(--input-bg);
+      border-radius: 2px;
+      margin-bottom: 0.5rem;
+      cursor: pointer;
+    }
+    
+    #progress-bar::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--highlight-color);
+      cursor: pointer;
+    }
+    
+    #progress-bar::-moz-range-thumb {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--highlight-color);
+      cursor: pointer;
+      border: none;
+    }
+    
+    .progress-buttons {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+    }
+    
+    .stats {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+      color: var(--text-color);
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Speed Reader</h1>
+    
+    <textarea id="inputText" placeholder="Paste your text here..."></textarea>
+    
+    <div class="controls">
+      <div class="control-group">
+        <label for="wpmInput">WPM:</label>
+        <input type="number" id="wpmInput" value="300" min="50" max="1500" step="10" />
+      </div>
+      
+      <button id="startBtn">Start</button>
+      <button id="pauseBtn">Pause</button>
+      <button id="restartBtn">↺</button>
+      <button id="editBtn">Edit</button>
+      
+      <div class="control-group">
+        <button id="fontIncreaseBtn">A+</button>
+        <button id="fontDecreaseBtn">A-</button>
+      </div>
+    </div>
+    
+    <div id="reading-container">
+      <div id="word">Ready</div>
+    </div>
+    
+    <div id="progress-container">
+      <input type="range" min="0" max="100" value="0" id="progress-bar">
+      <div class="progress-buttons">
+        <button id="backBtn">◀ 5s</button>
+        <button id="forwardBtn">5s ▶</button>
+      </div>
+      <div class="stats">
+        <span id="currentPosition">0/0</span>
+        <span id="timeRemaining">00:00</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Elements
+    const wordEl = document.getElementById('word');
+    const txt = document.getElementById('inputText');
+    const startBtn = document.getElementById('startBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const restartBtn = document.getElementById('restartBtn');
+    const editBtn = document.getElementById('editBtn');
+    const fontIncreaseBtn = document.getElementById('fontIncreaseBtn');
+    const fontDecreaseBtn = document.getElementById('fontDecreaseBtn');
+    const wpmInput = document.getElementById('wpmInput');
+    const progressBar = document.getElementById('progress-bar');
+    const backBtn = document.getElementById('backBtn');
+    const forwardBtn = document.getElementById('forwardBtn');
+    const currentPositionEl = document.getElementById('currentPosition');
+    const timeRemainingEl = document.getElementById('timeRemaining');
+    
+    // State variables
+    let words = [], originalText = "";
+    let index = 0, interval, paused = true;
+    let fontSize = 3; // em
+    let wpm = 300;
+    let isReading = false;
+    let lastStartTime = 0;
+    let elapsedPausedTime = 0;
+
+    // Initialize
+    function init() {
+      addDragListeners();
+      addEventListeners();
+      updateFontSize();
+      updateUI();
+    }
+    
+    // Add event listeners
+    function addEventListeners() {
+      startBtn.addEventListener('click', toggleReading);
+      pauseBtn.addEventListener('click', pauseReading);
+      restartBtn.addEventListener('click', restartReading);
+      editBtn.addEventListener('click', toggleEdit);
+      fontIncreaseBtn.addEventListener('click', increaseFont);
+      fontDecreaseBtn.addEventListener('click', decreaseFont);
+      backBtn.addEventListener('click', goBack);
+      forwardBtn.addEventListener('click', goForward);
+      wpmInput.addEventListener('change', updateWPM);
+      progressBar.addEventListener('input', updateProgressFromSlider);
+      
+      // Listen for WPM changes while reading
+      wpmInput.addEventListener('input', updateWPM);
+    }
+    
+    // Add drag & drop listeners
+    function addDragListeners() {
+      let isDragging = false, offsetX = 0, offsetY = 0;
+      
+      wordEl.addEventListener('mousedown', e => {
+        isDragging = true;
+        const rect = wordEl.getBoundingClientRect();
+        offsetX = e.clientX - rect.left;
+        offsetY = e.clientY - rect.top;
+        wordEl.style.cursor = 'grabbing';
+        e.preventDefault();
+      });
+      
+      document.addEventListener('mousemove', e => {
+        if (!isDragging) return;
+        const x = e.clientX - offsetX;
+        const y = e.clientY - offsetY;
+        wordEl.style.transform = `translate(${x - window.innerWidth/2}px, ${y - window.innerHeight/2}px)`;
+      });
+      
+      document.addEventListener('mouseup', () => {
+        isDragging = false;
+        wordEl.style.cursor = 'grab';
+      });
+    }
+    
+    // Start/resume reading
+    function toggleReading() {
+      if (!isReading) {
+        startReading();
+      } else if (paused) {
+        resumeReading();
+      } else {
+        pauseReading();
+      }
+    }
+    
+    // Start reading
+    function startReading() {
+      const text = txt.value.trim();
+      if (!text) return;
+      
+      originalText = text;
+      words = text.split(/\s+/);
+      
+      if (words.length === 0) return;
+      
+      
+      isReading = true;
+      paused = false;
+      startBtn.textContent = "Pause";
+      
+      
+      index = 0;
+      progressBar.max = words.length - 1;
+      progressBar.value = 0;
+      
+      
+      wpm = parseInt(wpmInput.value, 10) || 300;
+      startInterval();
+      
+      
+      updateProgressStats();
+    }
+    
+    
+    function startInterval() {
+      clearInterval(interval);
+      const delay = 60000 / wpm;
+      lastStartTime = Date.now();
+      
+      interval = setInterval(() => {
+        if (index < words.length) {
+          wordEl.textContent = words[index];
+          progressBar.value = index;
+          updateProgressStats();
+          index++;
+        } else {
+          completeReading();
+        }
+      }, delay);
+    }
+    
+    
+    function pauseReading() {
+      if (!isReading || paused) return;
+      
+      clearInterval(interval);
+      paused = true;
+      startBtn.textContent = "Resume";
+      elapsedPausedTime = 0;
+    }
+    
+    
+    function resumeReading() {
+      if (!isReading || !paused) return;
+      
+      paused = false;
+      startBtn.textContent = "Pause";
+      startInterval();
+    }
+    
+    
+    function restartReading() {
+      if (!originalText) return;
+      
+      clearInterval(interval);
+      index = 0;
+      progressBar.value = 0;
+      wordEl.textContent = words[0] || "Ready";
+      
+      if (isReading && !paused) {
+        startInterval();
+      }
+      
+      updateProgressStats();
+    }
+    
+    
+    function toggleEdit() {
+      const wasReading = isReading && !paused;
+      
+      if (wasReading) {
+        pauseReading();
+      }
+      
+      
+      txt.style.display = "block";
+      txt.focus();
+      
+      
+      editBtn.textContent = "Done";
+      
+      
+      const originalClickHandler = editBtn.onclick;
+      editBtn.onclick = function() {
+        
+        editBtn.textContent = "Edit";
+        editBtn.onclick = originalClickHandler;
+        
+        
+        const newText = txt.value.trim();
+        if (newText !== originalText) {
+          originalText = newText;
+          words = newText.split(/\s+/);
+          index = Math.min(index, words.length - 1);
+          progressBar.max = words.length - 1;
+          updateProgressStats();
+          
+          if (index >= 0 && index < words.length) {
+            wordEl.textContent = words[index];
+          }
+        }
+        
+        
+        if (wasReading) {
+          resumeReading();
+        }
+      };
+    }
+    
+    // Update WPM rate
+    function updateWPM() {
+      const newWpm = parseInt(wpmInput.value, 10) || 300;
+      wpm = Math.max(50, Math.min(1500, newWpm));
+      wpmInput.value = wpm;
+      
+      
+      if (isReading && !paused) {
+        startInterval();
+      }
+      
+      updateProgressStats();
+    }
+    
+    
+    function goBack() {
+      if (!isReading || words.length === 0) return;
+      
+      
+      const wordsToGoBack = Math.ceil(wpm / 12); 
+      index = Math.max(0, index - wordsToGoBack);
+      
+      
+      progressBar.value = index;
+      
+      
+      if (index < words.length) {
+        wordEl.textContent = words[index];
+      }
+      
+      updateProgressStats();
+      
+      
+      if (!paused) {
+        startInterval();
+      }
+    }
+    
+    
+    function goForward() {
+      if (!isReading || words.length === 0) return;
+      
+      
+      const wordsToGoForward = Math.ceil(wpm / 12); 
+      index = Math.min(words.length - 1, index + wordsToGoForward);
+      
+      
+      progressBar.value = index;
+      
+      
+      if (index < words.length) {
+        wordEl.textContent = words[index];
+      }
+      
+      updateProgressStats();
+      
+      
+      if (!paused) {
+        startInterval();
+      }
+    }
+    
+    // Update progress from slider
+    function updateProgressFromSlider() {
+      if (!isReading || words.length === 0) return;
+      
+      
+      index = parseInt(progressBar.value, 10);
+      
+      
+      if (index < words.length) {
+        wordEl.textContent = words[index];
+      }
+      
+      updateProgressStats();
+      
+      
+      if (!paused) {
+        startInterval();
+      }
+    }
+    
+    
+    function updateProgressStats() {
+      if (words.length === 0) {
+        currentPositionEl.textContent = "0/0";
+        timeRemainingEl.textContent = "00:00";
+        return;
+      }
+      
+      
+      currentPositionEl.textContent = `${index + 1}/${words.length}`;
+      
+      
+      const wordsRemaining = words.length - index;
+      const secondsRemaining = Math.ceil((wordsRemaining / wpm) * 60);
+      const minutes = Math.floor(secondsRemaining / 60);
+      const seconds = secondsRemaining % 60;
+      timeRemainingEl.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+    
+    
+    function completeReading() {
+      clearInterval(interval);
+      wordEl.textContent = "Finished";
+      paused = true;
+      startBtn.textContent = "Start";
+      updateProgressStats();
+    }
+    
+    
+    function increaseFont() {
+      fontSize += 0.5;
+      updateFontSize();
+    }
+    
+    function decreaseFont() {
+      fontSize = Math.max(1, fontSize - 0.5);
+      updateFontSize();
+    }
+    
+    function updateFontSize() {
+      wordEl.style.fontSize = `${fontSize}em`;
+    }
+    
+    
+    function updateUI() {
+      if (isReading) {
+        if (paused) {
+          startBtn.textContent = "Resume";
+        } else {
+          startBtn.textContent = "Pause";
+        }
+      } else {
+        startBtn.textContent = "Start";
+        wordEl.textContent = "Ready";
+      }
+    }
+    
+    
+    init();
+  </script>
+</body>
+</html>
